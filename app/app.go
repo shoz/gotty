@@ -5,9 +5,12 @@ import (
 	"log"
 	"net/http"
 	"os/exec"
+	"crypto/rand"
+	"math/big"
 	"strings"
 	"syscall"
 	"unsafe"
+	"strconv"
 
 	"github.com/elazarl/go-bindata-assetfs"
 	"github.com/gorilla/websocket"
@@ -19,29 +22,34 @@ type App struct {
 	Address     string
 	Port        string
 	PermitWrite bool
+	RandomUrl   bool
 	Command     []string
 }
 
-func New(address string, port string, permitWrite bool, command []string) *App {
+func New(address string, port string, permitWrite bool, randomUrl bool, command []string) *App {
 	return &App{
 		Address:     address,
 		Port:        port,
 		PermitWrite: permitWrite,
+		RandomUrl:   randomUrl,
 		Command:     command,
 	}
 }
 
 func (app *App) Run() error {
-	http.Handle("/",
-		http.FileServer(
-			&assetfs.AssetFS{Asset: Asset, AssetDir: AssetDir, Prefix: "bindata"},
-		),
-	)
-	http.HandleFunc("/ws", app.generateHandler())
+	path := "/"
+	if app.RandomUrl {
+		randomPath := generateRandomString(8)
+		path = "/" + randomPath + "/"
+	}
 
-	url := app.Address + ":" + app.Port
-	log.Printf("Server is running at %s, command: %s", url, strings.Join(app.Command, " "))
-	err := http.ListenAndServe(url, nil)
+	fs := http.StripPrefix(path, http.FileServer( &assetfs.AssetFS{Asset: Asset, AssetDir: AssetDir, Prefix: "bindata"}))
+	http.Handle(path, fs)
+	http.HandleFunc(path + "ws", app.generateHandler())
+
+	endpoint := app.Address + ":" + app.Port
+	log.Printf("Server is running at %s, command: %s", endpoint + path, strings.Join(app.Command, " "))
+	err := http.ListenAndServe(endpoint, nil)
 	if err != nil {
 		return err
 	}
@@ -190,4 +198,15 @@ func (app *App) generateHandler() func(w http.ResponseWriter, r *http.Request) {
 type command struct {
 	Name      string                 `json:"name"`
 	Arguments map[string]interface{} `json:"arguments"`
+}
+
+func generateRandomString(length int) string {
+	const base = 36
+	size := big.NewInt(base)
+	n := make([]byte, length)
+	for i, _ := range n {
+		c, _ := rand.Int(rand.Reader, size)
+		n[i] = strconv.FormatInt(c.Int64(), base)[0]
+	}
+	return string(n)
 }

@@ -32,6 +32,11 @@ func main() {
 			Usage:  "Permit clients to write to the TTY (BE CAREFUL)",
 			EnvVar: "GOTTY_PERMIT_WRITE",
 		},
+    cli.BoolFlag{
+	  	Name:   "random-url, r",
+   		Usage:  "Add a random string to the endpoint",
+			EnvVar: "GOTTY_RANDOM_URL",
+		},
 	}
 	cmd.Action = func(c *cli.Context) {
 		if len(c.Args()) == 0 {
@@ -39,7 +44,7 @@ func main() {
 			cli.ShowAppHelp(c)
 			os.Exit(1)
 		}
-		app := app.New(c.String("addr"), c.String("port"), c.Bool("permit-write"), c.Args())
+		app := app.New(c.String("addr"), c.String("port"), c.Bool("permit-write"), c.Bool("random-url"), c.Args())
 		err := app.Run()
 		if err != nil {
 			fmt.Println(err)
